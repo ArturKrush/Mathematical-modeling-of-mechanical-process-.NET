@@ -1,0 +1,85 @@
+﻿<Window x:Class="Lab1MathMod.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Lab1MathMod"
+        xmlns:ScottPlot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
+        mc:Ignorable="d"
+        Title="Моделювання складного руху МТ" Height="700" Width="1000"
+        WindowStartupLocation="CenterScreen"
+        Loaded="Window_Loaded">
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Рядок 1: Кнопка "За замовчуванням" та "Частота коливань" -->
+        <Grid Grid.Row="0" Margin="5">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Button x:Name="DefaultValuesButton"
+                    Grid.Column="0"
+                    Content="Значення за замовчуванням" 
+                    Padding="10,5"
+                    HorizontalAlignment="Left"
+                    Click="DefaultValuesButton_Click"/>
+
+            <TextBlock x:Name="FrequencyLabel"
+                       Grid.Column="1"
+                       Text="Частота коливань k: -"
+                       FontSize="16"
+                       FontWeight="Bold"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Рядок 2: Зображення та Графік -->
+        <Grid Grid.Row="1" Margin="0,10,0,10">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0" Margin="5">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="1*"/>
+                    <!-- 1 частина для формули -->
+                    <RowDefinition Height="6*"/>
+                    <!-- 6 частини для моделі (було 2*) -->
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Padding="5">
+                    <!-- Видалено Height="200" -->
+                    <Image x:Name="EquationImage" Stretch="Uniform"/>
+                </Border>
+
+                <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0">
+                    <!-- Видалено Height="200" -->
+                    <Image x:Name="ModelImage" Stretch="Uniform"/>
+                </Border>
+            </Grid>
+
+            <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="5">
+                <ScottPlot:WpfPlot x:Name="MainPlot"/>
+            </Border>
+        </Grid>
+
+        <!-- Рядок 3: Параметри моделі -->
+        <GroupBox Grid.Row="2" Header="Параметри моделі" FontWeight="Bold" Margin="5">
+            <WrapPanel Orientation="Horizontal" ItemWidth="300" Margin="10">
+                <local:NumericInputControl x:Name="c_Input" Label="Коефіціієнт жорсткості c (Н/м)" Step="0.01" Format="F2"/>
+                <local:NumericInputControl x:Name="m_Input" Label="Маса m (кг)" Step="0.01" Format="F2"/>
+                <local:NumericInputControl x:Name="omega_Input" Label="Кутова швидкість ω (рад/с)" Step="0.1" Format="F2"/>
+                <local:NumericInputControl x:Name="x0_Input" Label="Початкова координата x₀ (м)" Step="0.1" Format="F2"/>
+                <local:NumericInputControl x:Name="v0_Input" Label="Початкова швидкість v₀ (м/с)" Step="0.1" Format="F2"/>
+                <local:NumericInputControl x:Name="l0_Input" Label="Довжина l₀ (м)" Step="0.1" Format="F2"/>
+            </WrapPanel>
+        </GroupBox>
+    </Grid>
+</Window>
