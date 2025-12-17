@@ -16,10 +16,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Рядок 1: Кнопка "За замовчуванням" та "Частота коливань" -->
+        <!-- Рядок 1: Кнопка "За замовчуванням", Вибір кроку та "Частота коливань" -->
         <Grid Grid.Row="0" Margin="5">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <!-- Для ComboBox -->
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
@@ -30,8 +32,19 @@
                     HorizontalAlignment="Left"
                     Click="DefaultValuesButton_Click"/>
 
+            <!-- Вибір кроку інтегрування -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="Крок (h): " VerticalAlignment="Center" FontWeight="Bold"/>
+                <ComboBox x:Name="StepComboBox" Width="80" SelectionChanged="StepComboBox_SelectionChanged" SelectedIndex="1">
+                    <ComboBoxItem Content="0.1" Tag="0.1"/>
+                    <ComboBoxItem Content="0.01" Tag="0.01"/>
+                    <ComboBoxItem Content="0.001" Tag="0.001"/>
+                    <ComboBoxItem Content="0.0001" Tag="0.0001"/>
+                </ComboBox>
+            </StackPanel>
+
             <TextBlock x:Name="FrequencyLabel"
-                       Grid.Column="1"
+                       Grid.Column="2"
                        Text="Частота коливань k: -"
                        FontSize="16"
                        FontWeight="Bold"
@@ -46,27 +59,26 @@
                 <ColumnDefinition Width="1*"/>
             </Grid.ColumnDefinitions>
 
+            <!-- Ліва колонка: Зображення -->
             <Grid Grid.Column="0" Margin="5">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="1*"/>
-                    <!-- 1 частина для формули -->
-                    <RowDefinition Height="6*"/>
-                    <!-- 6 частини для моделі (було 2*) -->
+                    <RowDefinition Height="3*"/>
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0" BorderBrush="Gray" BorderThickness="1" Padding="5">
-                    <!-- Видалено Height="200" -->
                     <Image x:Name="EquationImage" Stretch="Uniform"/>
                 </Border>
 
                 <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Padding="5" Margin="0,10,0,0">
-                    <!-- Видалено Height="200" -->
                     <Image x:Name="ModelImage" Stretch="Uniform"/>
                 </Border>
             </Grid>
 
+            <!-- Права колонка: Графік -->
+            <!-- Додаємо PreviewMouseRightButtonDown для відловлювання кліку правою кнопкою -->
             <Border Grid.Column="1" BorderBrush="Gray" BorderThickness="1" Margin="5">
-                <ScottPlot:WpfPlot x:Name="MainPlot"/>
+                <ScottPlot:WpfPlot x:Name="MainPlot" PreviewMouseRightButtonDown="MainPlot_PreviewMouseRightButtonDown"/>
             </Border>
         </Grid>
 

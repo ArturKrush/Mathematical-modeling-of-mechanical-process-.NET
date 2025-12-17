@@ -1,5 +1,6 @@
-﻿using ScottPlot; // Додаємо ScottPlot
+﻿using ScottPlot;
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -10,10 +11,11 @@ namespace Lab1MathMod
 {
     public partial class MainWindow : Window
     {
-        // Змінні для параметрів з кроком (для кнопок вгору/вниз)
         private const double ParamStep = 0.01;
+        private bool _isSettingDefaults = false;
 
-        private bool isSettingDefaults = false;
+        // Дані для передачі у вікно помилок (щоб не перераховувати їх двічі)
+        private List<CalculationResult> _lastResults = new List<CalculationResult>();
 
         public MainWindow()
         {
@@ -24,12 +26,11 @@ namespace Lab1MathMod
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             LoadImages();
-            SetDefaultValues(); // Встановлюємо значення за замовчуванням при завантаженні
+            SetDefaultValues();
         }
 
         private void SetupNumericInputs()
         {
-            // Додаємо обробник події ValueChanged до кожного NumericInputControls
             c_Input.ValueChanged += OnParameterChanged;
             m_Input.ValueChanged += OnParameterChanged;
             omega_Input.ValueChanged += OnParameterChanged;
@@ -38,18 +39,19 @@ namespace Lab1MathMod
             l0_Input.ValueChanged += OnParameterChanged;
         }
 
-        // Обробник, який викликає UpdatePlot при зміні будь-якого параметра
         private void OnParameterChanged(object? sender, EventArgs e)
         {
-            if (isSettingDefaults)
-            {
-                return;
-            }
-
+            if (_isSettingDefaults) return;
             UpdatePlot();
         }
 
-        // Завантаження зображень
+        // Обробник зміни кроку в ComboBox
+        private void StepComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_isSettingDefaults) return;
+            if (IsLoaded) UpdatePlot();
+        }
+
         private void LoadImages()
         {
             try
@@ -62,23 +64,19 @@ namespace Lab1MathMod
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Не вдалося завантажити зображення. Перевірте шляхи у методі LoadImages().\nПомилка: {ex.Message}", "Помилка завантаження зображень");
+                // Ігноруємо помилки завантаження
             }
         }
 
-        // Обробник кнопки "Значеннь за замовчуванням"
         private void DefaultValuesButton_Click(object sender, RoutedEventArgs e)
         {
             SetDefaultValues();
         }
 
-        // Встановлює параметри Варіанту 4
         private void SetDefaultValues()
         {
-            // Завдяки прапорцю OnParameterChanged не спрацює при завантаженні
-            isSettingDefaults = true;
+            _isSettingDefaults = true;
 
-            // Варіант 4:
             c_Input.Value = 0.45;
             m_Input.Value = 0.02;
             omega_Input.Value = 2.0 / 3.0;
@@ -86,13 +84,32 @@ namespace Lab1MathMod
             v0_Input.Value = 0.3;
             l0_Input.Value = 0.5;
 
-            isSettingDefaults = false;
+            StepComboBox.SelectedIndex = 1; // 0.01 за замовчуванням
 
-            // Оновлюємо графік після встановлення *всіх* значень
+            _isSettingDefaults = false;
             UpdatePlot();
         }
 
-        // Обчислення та оновлення графіка
+        // АНАЛІТИЧНИЙ МЕТОД
+        private double CalculateAnalytical(double t, double k_squared, double B, double x0, double v0, double k)
+        {
+            if (k_squared > 0)
+            {
+                return (x0 - B / k_squared) * Math.Cos(k * t) + (v0 / k) * Math.Sin(k * t) + (B / k_squared);
+            }
+            else if (k_squared < 0)
+            {
+                double k_abs_sqrt = Math.Sqrt(Math.Abs(k_squared));
+                double C1 = (x0 / 2.0) + v0 / (2.0 * k_abs_sqrt) - B / (2.0 * k_squared);
+                double C2 = (x0 / 2.0) - v0 / (2.0 * k_abs_sqrt) - B / (2.0 * k_squared);
+                return C1 * Math.Exp(k_abs_sqrt * t) + C2 * Math.Exp(-k_abs_sqrt * t) + (B / k_squared);
+            }
+            else // k_squared == 0
+            {
+                return (B * Math.Pow(t, 2)) / 2.0 + v0 * t + x0;
+            }
+        }
+
         private void UpdatePlot()
         {
             // 1. Зчитуємо параметри
@@ -103,87 +120,144 @@ namespace Lab1MathMod
             double v0 = v0_Input.Value;
             double l0 = l0_Input.Value;
 
-            // Перевірка на нульову масу, щоб уникнути ділення на нуль
-            if (m == 0)
+            if (m == 0) { MessageBox.Show("Маса (m) не може бути 0."); return; }
+
+            // 2. Отримуємо крок з ComboBox
+            double h = 0.01;
+            if (StepComboBox.SelectedItem is ComboBoxItem selectedItem && selectedItem.Tag != null)
             {
-                MessageBox.Show("Маса (m) не може дорівнювати нулю.", "Помилка в параметрах");
-                return;
+                double.TryParse(selectedItem.Tag.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out h);
             }
 
-            // 2. Обчислюємо проміжні величини
-            double k_squared = (c / m) - Math.Pow(omega, 2);
-            double B = (c * l0) / m;
-            double k = 0;
+            // 3. Параметри моделі
+            k_squared = (c / m) - Math.Pow(omega, 2);
+            B = (c * l0) / m;
+            double k = (k_squared > 0) ? Math.Sqrt(k_squared) : 0;
 
-            // 3. Готуємо дані для графіка
-            int N = 1001; // Кількість точок
+            if (k_squared > 0) FrequencyLabel.Text = $"Частота коливань k: {k:F4} рад/с";
+            else if (k_squared < 0) FrequencyLabel.Text = "Частота коливань k: - (аперіодичний)";
+            else FrequencyLabel.Text = "Частота коливань k: 0 (критичний)";
+
+            // 4. Підготовка даних
+            _lastResults.Clear();
             double t_max = 10.0;
-            double[] tValues = new double[N];
-            double[] xValues = new double[N];
 
-            // 4. Обираємо розв'язок ДР залежно від k^2
-            // --- Випадок 1: k^2 > 0 (Коливання) ---
-            if (k_squared > 0)
+            // --- ЧИСЕЛЬНИЙ РОЗВ'ЯЗОК (Рунге-Кутта) ---
+            List<double> tNum = new List<double>();
+            List<double> xNum = new List<double>();
+
+            // Початкові умови: y1 = x (положення), y2 = v (швидкість)
+            double y1 = x0;
+            double y2 = v0;
+
+            double t_current = 0;
+
+            // +h/1000.0 для компенсації похибки float при порівнянні
+            while (t_current <= t_max + h / 1000.0)
             {
-                k = Math.Sqrt(k_squared);
-                FrequencyLabel.Text = $"Частота коливань k: {k:F4} рад/с";
+                tNum.Add(t_current);
+                xNum.Add(y1);
 
-                for (int i = 0; i < N; i++)
+                // Розрахунок аналітичного для таблиці
+                double analVal = CalculateAnalytical(t_current, k_squared, B, x0, v0, k);
+
+                CalculationResult res = new CalculationResult
                 {
-                    double t = (t_max * i) / (N - 1);
-                    tValues[i] = t;
-                    xValues[i] = (x0 - B / k_squared) * Math.Cos(k * t) + (v0 / k) * Math.Sin(k * t) + (B / k_squared);
-                }
+                    Time = t_current,
+                    Analytical = analVal,
+                    Numerical = y1
+                };
+                res.AbsError = Math.Abs(res.Analytical - res.Numerical);
+                res.RelError = (Math.Abs(res.Analytical) > 0) ? (res.AbsError / Math.Abs(res.Analytical)) : 0;
+                res.RelErrorPercent = res.RelError * 100.0;
+                _lastResults.Add(res);
+
+                // k1
+                double k1_y1 = h * F1(t_current, y1, y2);
+                double k1_y2 = h * F2(t_current, y1, y2);
+
+                // k2
+                double k2_y1 = h * F1(t_current + 0.5 * h, y1 + 0.5 * k1_y1, y2 + 0.5 * k1_y2);
+                double k2_y2 = h * F2(t_current + 0.5 * h, y1 + 0.5 * k1_y1, y2 + 0.5 * k1_y2);
+
+                // k3
+                double k3_y1 = h * F1(t_current + 0.5 * h, y1 + 0.5 * k2_y1, y2 + 0.5 * k2_y2);
+                double k3_y2 = h * F2(t_current + 0.5 * h, y1 + 0.5 * k2_y1, y2 + 0.5 * k2_y2);
+
+                // k4
+                double k4_y1 = h * F1(t_current + h, y1 + k3_y1, y2 + k3_y2);
+                double k4_y2 = h * F2(t_current + h, y1 + k3_y1, y2 + k3_y2);
+
+                y1 = y1 + (1.0 / 6.0) * (k1_y1 + 2 * k2_y1 + 2 * k3_y1 + k4_y1);
+                y2 = y2 + (1.0 / 6.0) * (k1_y2 + 2 * k2_y2 + 2 * k3_y2 + k4_y2);
+
+                t_current += h;
             }
-            // --- Випадок 2: k^2 < 0 (Аперіодичний рух) ---
-            else if (k_squared < 0)
+
+            // --- АНАЛІТИЧНИЙ РОЗВ'ЯЗОК (для графіка) ---
+            int N_anal = 1001;
+            double[] tAnalPoints = new double[N_anal];
+            double[] xAnalPoints = new double[N_anal];
+            for (int i = 0; i < N_anal; i++)
             {
-                FrequencyLabel.Text = "Частота коливань k: - (аперіодичний рух)";
-                double k_abs_sqrt = Math.Sqrt(Math.Abs(k_squared));
-
-                double C1 = (x0 / 2.0) + v0 / (2.0 * k_abs_sqrt) - B / (2.0 * k_squared);
-                double C2 = (x0 / 2.0) - v0 / (2.0 * k_abs_sqrt) - B / (2.0 * k_squared);
-
-                for (int i = 0; i < N; i++)
-                {
-                    double t = (t_max * i) / (N - 1);
-                    tValues[i] = t;
-                    xValues[i] = C1 * Math.Exp(k_abs_sqrt * t) + C2 * Math.Exp(-k_abs_sqrt * t) + (B / k_squared);
-                }
-            }
-            // --- Випадок 3: k^2 = 0 (Критичний випадок) ---
-            else // k_squared == 0
-            {
-                FrequencyLabel.Text = "Частота коливань k: 0 (критичний випадок)";
-                for (int i = 0; i < N; i++)
-                {
-                    double t = (t_max * i) / (N - 1);
-                    tValues[i] = t;
-                    xValues[i] = (B * Math.Pow(t, 2)) / 2.0 + v0 * t + x0;
-                }
+                double t = (t_max * i) / (N_anal - 1);
+                tAnalPoints[i] = t;
+                xAnalPoints[i] = CalculateAnalytical(t, k_squared, B, x0, v0, k);
             }
 
-            // 5. Оновлюємо ScottPlot
-            MainPlot.Plot.Clear(); // Очищуємо попередній графік
+            // 5. Малюємо графіки
+            MainPlot.Plot.Clear();
 
-            // Додаємо Scatter (точковий графік), але робимо маркери невидимими
-            var linePlot = MainPlot.Plot.Add.Scatter(tValues, xValues);
+            // --- АНАЛІТИЧНИЙ: ЧОРНИЙ ---
+            var analPlot = MainPlot.Plot.Add.Scatter(tAnalPoints, xAnalPoints);
+            analPlot.LineWidth = 2;
+            analPlot.Color = Colors.Black; // Чорний колір
+            analPlot.MarkerSize = 0;
+            analPlot.LegendText = "Аналітичний";
 
-            // --- Ось тут ми встановлюємо товщину та колір лінії ---
-            linePlot.LineWidth = 1;
-            linePlot.MarkerSize = 0;  // Ховаємо маркери
-            linePlot.Color = Colors.Blue;
+            // --- ЧИСЕЛЬНИЙ: СИНІЙ ---
+            var numPlot = MainPlot.Plot.Add.Scatter(tNum.ToArray(), xNum.ToArray());
+            numPlot.LineWidth = 2;       // Повноцінна лінія
+            numPlot.MarkerSize = 0;      // Без точок, суцільна крива
+            numPlot.Color = Colors.Blue; // Синій колір
+            numPlot.LegendText = "Чисельний (Рунге-Кутта)";
 
-            // Налаштування осей та назви
-            MainPlot.Plot.Title("Графік руху x(t)");
+            MainPlot.Plot.Title($"Графік руху x(t). Крок h={h}");
             MainPlot.Plot.XLabel("Час t (c)");
             MainPlot.Plot.YLabel("Положення x (м)");
-
-            // Автоматично налаштовуємо межі осей
+            MainPlot.Plot.ShowLegend();
             MainPlot.Plot.Axes.AutoScale();
-
-            // Оновлюємо (перемальовуємо) графік
             MainPlot.Refresh();
         }
+
+        double B;
+        double k_squared;
+
+        public double F1(double t, double y1, double y2) {
+            return y2;
+        }
+
+        public double F2(double t, double y1, double y2)
+        {
+            return B - k_squared * y1;
+        }
+
+        private void MainPlot_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ErrorWindow errorWin = new ErrorWindow(_lastResults);
+            errorWin.Owner = this;
+            errorWin.ShowDialog();
+            e.Handled = true;
+        }
+    }
+
+    public class CalculationResult
+    {
+        public double Time { get; set; }
+        public double Analytical { get; set; }
+        public double Numerical { get; set; }
+        public double AbsError { get; set; }
+        public double RelError { get; set; }
+        public double RelErrorPercent { get; set; }
     }
 }
